@@ -2,6 +2,7 @@ import streamlit as st
 from googleapiclient.discovery import build
 from googleapiclient.discovery_cache.base import Cache
 import tempfile
+import ffmpeg
 
 # Disable the discovery cache warning
 class MemoryCache(Cache):
