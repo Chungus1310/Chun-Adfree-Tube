@@ -74,8 +74,8 @@ class TempFileManager:
         self.temp_dir = tempfile.mkdtemp(prefix='streamlit_youtube_')
         # Dictionary to store file paths and their creation timestamps
         self.active_files = {}
-        # Set cleanup interval (15 minutes in seconds)
-        self.cleanup_interval = 15 * 60
+        # Set cleanup interval (60 minutes in seconds)
+        self.cleanup_interval = 60 * 60
         # Start the cleanup thread
         self.cleanup_thread = threading.Thread(target=self._periodic_cleanup, daemon=True)
         self.cleanup_thread.start()
