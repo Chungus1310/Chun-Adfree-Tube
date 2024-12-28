@@ -18,7 +18,12 @@ from datetime import datetime
 import os
 import atexit
 import glob
-import logging
+import threading
+import time
+import os
+import glob
+import atexit
+import logging as logger
 from contextlib import contextmanager
 import yt_dlp
 import json
@@ -64,16 +69,23 @@ CUSTOM_CSS = """
 """
 
 class TempFileManager:
-    """Enhanced temporary file manager with better error handling"""
+    """Enhanced temporary file manager with timed cleanup and individual file tracking"""
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp(prefix='streamlit_youtube_')
-        self.active_files = set()
+        # Dictionary to store file paths and their creation timestamps
+        self.active_files = {}
+        # Set cleanup interval (15 minutes in seconds)
+        self.cleanup_interval = 15 * 60
+        # Start the cleanup thread
+        self.cleanup_thread = threading.Thread(target=self._periodic_cleanup, daemon=True)
+        self.cleanup_thread.start()
         atexit.register(self.cleanup_all)
         logger.info(f"Initialized TempFileManager with directory: {self.temp_dir}")
     
     def create_temp_file(self, video_id):
         temp_path = os.path.join(self.temp_dir, f"{video_id}.mp4")
-        self.active_files.add(temp_path)
+        # Store the file path with current timestamp
+        self.active_files[temp_path] = time.time()
         logger.info(f"Created temporary file: {temp_path}")
         return temp_path
     
@@ -81,16 +93,38 @@ class TempFileManager:
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
-                self.active_files.discard(file_path)
+                # Remove from tracking dictionary
+                self.active_files.pop(file_path, None)
                 logger.info(f"Cleaned up file: {file_path}")
         except Exception as e:
             logger.error(f"Error cleaning up file {file_path}: {str(e)}")
     
+    def _periodic_cleanup(self):
+        """Periodically check and clean files older than 15 minutes"""
+        while True:
+            current_time = time.time()
+            # Create a list of files to clean (avoid modifying dict during iteration)
+            files_to_clean = [
+                file_path
+                for file_path, timestamp in self.active_files.items()
+                if current_time - timestamp > self.cleanup_interval
+            ]
+            
+            # Clean up old files
+            for file_path in files_to_clean:
+                self.cleanup_file(file_path)
+            
+            # Sleep for a minute before next check
+            time.sleep(60)
+    
     def cleanup_all(self):
-        for file_path in list(self.active_files):
+        """Clean up all files and stop the cleanup thread"""
+        # Clean up all tracked files
+        for file_path in list(self.active_files.keys()):
             self.cleanup_file(file_path)
         
         try:
+            # Clean up any remaining files that might have been missed
             remaining_files = glob.glob(os.path.join(self.temp_dir, "*"))
             for file_path in remaining_files:
                 os.remove(file_path)
