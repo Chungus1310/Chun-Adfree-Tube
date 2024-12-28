@@ -136,8 +136,8 @@ class TempFileManager:
         except Exception as e:
             logger.error(f"Error during cleanup: {str(e)}")
 
-def download_and_stream_video(video_id, temp_file_manager):
-    """Enhanced video download function with better quality control and error handling"""
+def download_and_stream_video(video_id, temp_file_manager, cookies_path=None):
+    """Enhanced video download function with cookie support"""
     try:
         ydl_opts = {
             'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]',
@@ -150,6 +150,10 @@ def download_and_stream_video(video_id, temp_file_manager):
                 'preferedformat': 'mp4',
             }],
         }
+        
+        # Add cookies if path is provided
+        if cookies_path and os.path.exists(cookies_path):
+            ydl_opts['cookiefile'] = cookies_path
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             with st.spinner("Preparing video stream..."):
@@ -329,7 +333,7 @@ def get_channel_videos_with_details(youtube, channel_id, max_results=2):
         logger.error(f"Error in get_channel_videos_with_details: {str(e)}")
         return []
 
-def display_video_card(video, idx, video_type, temp_file_manager):
+def display_video_card(video, idx, video_type, temp_file_manager, cookies_path=None):
     """Display a video card using pre-fetched details"""
     with st.container():
         st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -355,19 +359,19 @@ def display_video_card(video, idx, video_type, temp_file_manager):
         col1, col2 = st.columns(2)
         with col1:
             if st.button(f"▶ Stream", key=f"stream_{video_type}_{idx}_{video['video_id']}"):
-                handle_video_stream(video, temp_file_manager)
+                handle_video_stream(video, temp_file_manager, cookies_path)
         
         with col2:
             if st.button(f"⬇ Download", key=f"download_{video_type}_{idx}_{video['video_id']}"):
-                handle_video_download(video, temp_file_manager)
+                handle_video_download(video, temp_file_manager, cookies_path)
 
-def handle_video_stream(video, temp_file_manager):
+def handle_video_stream(video, temp_file_manager, cookies_path=None):
     """Handle video streaming with proper error handling and video playback"""
     try:
         if st.session_state.current_video:
             st.session_state.previous_video = st.session_state.current_video
         
-        video_path = download_and_stream_video(video['video_id'], temp_file_manager)
+        video_path = download_and_stream_video(video['video_id'], temp_file_manager, cookies_path)
         if video_path:
             st.session_state.current_video = video_path
             
@@ -389,10 +393,10 @@ def handle_video_stream(video, temp_file_manager):
         logger.error(f"Error streaming video: {str(e)}")
         st.error("Failed to stream video. Please try again.")
 
-def handle_video_download(video, temp_file_manager):
+def handle_video_download(video, temp_file_manager, cookies_path=None):
     """Handle video download with proper error handling"""
     try:
-        video_path = download_and_stream_video(video['video_id'], temp_file_manager)
+        video_path = download_and_stream_video(video['video_id'], temp_file_manager, cookies_path)
         if video_path:
             with open(video_path, "rb") as file:
                 file_stats = os.stat(video_path)
@@ -487,6 +491,20 @@ def main():
         """)
         return
     
+    # Add cookies.txt uploader
+    cookies_file = st.file_uploader(
+        "Upload cookies.txt file (optional)", 
+        type=['txt'],
+        help="Upload cookies.txt file for accessing age-restricted or private videos"
+    )
+    
+    # Save uploaded cookies file to temp directory
+    cookies_path = None
+    if cookies_file is not None:
+        cookies_path = os.path.join(st.session_state.temp_file_manager.temp_dir, 'cookies.txt')
+        with open(cookies_path, 'wb') as f:
+            f.write(cookies_file.getvalue())
+    
     # Initialize YouTube API client
     youtube = setup_youtube_api(api_key)
     if not youtube:
@@ -531,7 +549,7 @@ def main():
             cols = st.columns(2)
             for idx, video in enumerate(videos):
                 with cols[idx % 2]:
-                    display_video_card(video, idx, "search", st.session_state.temp_file_manager)
+                    display_video_card(video, idx, "search", st.session_state.temp_file_manager, cookies_path)
         
         # If a channel is selected, fetch its videos with combined details
         if st.session_state.selected_channel:
@@ -543,7 +561,7 @@ def main():
                 cols = st.columns(2)
                 for idx, video in enumerate(channel_videos):
                     with cols[idx % 2]:
-                        display_video_card(video, idx, "channel", st.session_state.temp_file_manager)
+                        display_video_card(video, idx, "channel", st.session_state.temp_file_manager, cookies_path)
 
 if __name__ == "__main__":
     main()
