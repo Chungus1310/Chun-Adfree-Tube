@@ -1,0 +1,7 @@
+google-api-python-client 
+streamlit
+google-auth-httplib2
+google-auth-oauthlib
+pandas 
+ffmpeg-python
+yt_dlp
