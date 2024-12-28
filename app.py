@@ -28,16 +28,16 @@ from contextlib import contextmanager
 import yt_dlp
 import json
 
-# Enhanced logging configuration
-logging.basicConfig(
-    level=logging.INFO,
+# Enhanced logger configuration
+logger.basicConfig(
+    level=logger.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('youtube_app.log'),
-        logging.StreamHandler()
+        logger.FileHandler('youtube_app.log'),
+        logger.StreamHandler()
     ]
 )
-logger = logging.getLogger(__name__)
+logger = logger.getLogger(__name__)
 
 # Custom CSS to improve design
 CUSTOM_CSS = """
